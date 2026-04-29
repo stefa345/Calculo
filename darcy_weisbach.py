@@ -2,92 +2,105 @@ import math
 import numpy as np
 from friccion import factor_friccion
 
-# ---- DATOS ----
-C = 3000 # l/hr
-Longitud_recta = 21.68 # m
-Altura = 10.28 # m
-velocidad_deseada = 0.7 # m/s
+# -------- DATOS --------
+C = 3000            # l/hr
+Longitud_recta = 21.68   # m
+Altura = 10.28      # m
+velocidad_deseada = 0.7  # m/s
+velocidad_min = 0.5      # m/s
 
-# ---- Accesorios ----
-Codos90 = 7
-Te_recta= 0
-Te_lateral = 0
-LLP = 1
-Valvula_retencion = 1
+eps = 1.5e-6        # rugosidad absoluta en metros
+f0 = 0.025          # fricción inicial
 
-# ---- CALCULO ----
+# -------- Accesorios --------
+accesorios = {
+    "Te_recta": 0,
+    "Te_lateral": 0,
+    "Codo_90": 7,
+    "LLP": 1,
+    "Valvula_retencion": 1
+}
 
+K = {
+    "Te_recta": 1.5,
+    "Te_lateral": 2.5,
+    "Codo_90": 1.5,
+    "LLP": 0.5,
+    "Valvula_retencion": 5
+}
+
+# -------- FUNCIONES --------
 Q = C / (1000*3600) # m^3/s
 eps = 1.5e-6 
 f=0.025
+
+def caudal(C):
+    return C / (1000*3600)
 
 def v_med(Q, D):
     v_med = (4*Q) / (math.pi * D**2)
     return v_med
 
-def reynolds(Q, D):
-    Re=(v_med(Q, D))*D*(1/1.0038e-6)
+def reynolds(Q, D, nu=1.0038e-6):
+    Re=(v_med(Q, D))*D*(1/nu)
     return Re
 
 def perdida_carga(f, D, v):
     R = (f * (v**2)) / (2*D*9.81)
     return R
 
-def l_equivalente(ki,D,f):
-    L_eq = (ki * D) / f
-    return L_eq
+def l_equivalente(D,f):
+    total = 0
+    for key in K:
+        Leq = (K[key] * D) / f
+        total += Leq * accesorios[key]
+    return Leq
 
 def Hf(h, L, Leq, j):
     Hf = h + (L + Leq) * j
     return Hf
 
-# Te recta, Te lateral, Codo 90°, LLP, V-Retencion
-K = [1.5, 2.5, 1.5, 0.5, 5] 
-D = [float(x) for x in open("Calculo/lista-diametros.txt", "r").readlines()]
-Re = [reynolds(Q, D[i]) for i in range(len(D))]
-v = [v_med(Q, D[i]) for i in range(len(D))]
-deltav = [abs(v[i] - velocidad_deseada) for i in range(len(D))]
+def pot_bomba(H,Q, eficiencia=0.4):
+    HP = (H*Q*1000*0.013)/eficiencia
+    return HP
 
-print("---------------------------------------------------------------------")
-print("     ","Longitudes equivalentes de accesorios en metros")
-print("Diametro", " ", "Te recta", " ", "Te lateral", "  ", "Codo 90°", "   ", "LLP" ," ", "V-Retencion")
-for j in range(len(D)):
-    fr = [factor_friccion(f, D[j], eps, Re[j]) for j in range(len(D))]
-    L_eq0 = l_equivalente(K[0], D[j], fr[j])
-    L_eq1 = l_equivalente(K[1], D[j], fr[j])
-    L_eq2 = l_equivalente(K[2], D[j], fr[j])
-    L_eq3 = l_equivalente(K[3], D[j], fr[j])
-    L_eq4 = l_equivalente(K[4], D[j], fr[j])
-    print(f"{D[j]:.3f}", "     ", f"{L_eq0:.3f} m","   ", f"{L_eq1:.3f} m", "   ", f"{L_eq2:.3f} m", "  ", f"{L_eq3:.3f} m", "  ", f"{L_eq4:.3f} m")
+# -------- CALCULO --------
+Q = caudal(C)
 
-print("---------------------------------------------------------------------")
-print("diam", " ", "Velocidad [m/s]", " ", "Hf [m]", "", "Perdida [m/m]", "", "L-eq [m]")
-for i in range(len(D)):
-    if deltav[i] == np.min(deltav) and v[i] > 0.5:
-        fr = [factor_friccion(f, D[i], eps, Re[i]) for i in range(len(D))]
-        R = [perdida_carga(fr[i], D[i], v[i]) for i in range(len(D))]
-        L_eq0 = l_equivalente(K[0], D[i], fr[i])
-        L_eq1 = l_equivalente(K[1], D[i], fr[i])
-        L_eq2 = l_equivalente(K[2], D[i], fr[i])
-        L_eq3 = l_equivalente(K[3], D[i], fr[i])
-        L_eq4 = l_equivalente(K[4], D[i], fr[i])
-        L_eqtotal = (L_eq0*Te_recta) + (L_eq1*Te_lateral) + (L_eq2*Codos90) + (L_eq3*LLP) + (L_eq4*Valvula_retencion)
-        H = Hf(Altura, Longitud_recta, L_eqtotal, R[i])
-        HP = (H*Q*1000*0.013)/0.4
-        print(f"{D[i]}","    ", f"{v[i]:.3f}","       ", f"{H:.3f}", "    ", "R =", f"{R[i]:.3f}", "  ", f"{L_eqtotal:.3f}")
-        print("Bomba »", f"{HP:.3f} HP")
-    elif deltav[i] == np.min(deltav):
-        print("No se encontró un diámetro con velocidad mayor a 0.5 m/s.")
-        fr = [factor_friccion(f, D[i], eps, Re[i]) for i in range(len(D))]
-        R = [perdida_carga(fr[i], D[i], v[i]) for i in range(len(D))]
-        L_eq0 = l_equivalente(K[0], D[i-1], fr[i-1])
-        L_eq1 = l_equivalente(K[1], D[i-1], fr[i-1])
-        L_eq2 = l_equivalente(K[2], D[i-1], fr[i-1])
-        L_eq3 = l_equivalente(K[3], D[i-1], fr[i-1])
-        L_eq4 = l_equivalente(K[4], D[i], fr[i])
-        L_eqtotal = (L_eq0*Te_recta) + (L_eq1*Te_lateral) + (L_eq2*Codos90) + (L_eq3*LLP) + (L_eq4*Valvula_retencion)
-        H = Hf(Altura, Longitud_recta, L_eqtotal, R[i-1])
-        HP = (H*Q*1000*0.013)/0.4
-        print(f"{D[i-1]}","   ", f"{v[i-1]:.3f}","  ", f"{H:.3f}", "    ", "R =", f"{R[i-1]:.3f}", "    ", f"{L_eqtotal:.3f}")
-        print("Bomba »", f"{HP:.3f} HP")
-print("---------------------------------------------------------------------")
+with open("lista-diametros.txt", "r") as f:
+    D = np.array([float(x) for x in f.readlines()])
+
+v = np.array([v_med(Q,d) for d in D])
+Re = np.array([reynolds(v[i],D[i]) for i in range(len(D))])
+fr = np.array([factor_friccion(f0, D[i], eps, Re[i]) for i in range(len(D))])
+j = np.array([perdida_carga(fr[i],D[i],v[i]) for i in range(len(D))])
+
+deltav = np.abs(v - velocidad_deseada)
+
+verificar = np.where(v >= velocidad_min)[0]
+if len(verificar) == 0:
+    print("No existe diámetro con velocidad mayor a la mínima")
+    idx = np.argmin(deltav)
+else:
+    idx = verificar[np.argmin(deltav[verificar])]
+
+# -------- RESULTADOS --------
+D_sel = D[idx]
+v_sel = v[idx]
+f_sel = fr[idx]
+j_sel = j[idx]
+
+Leq_total = l_equivalente(D_sel, f_sel)
+H = Hf(Altura, Longitud_recta, Leq_total, j_sel)
+HP = pot_bomba(H, Q)
+
+# -------- SALIDA --------
+
+print("-----------------------------------")
+print(f"Diámetro: {D_sel:.3f} m")
+print(f"Velocidad: {v_sel:.3f} m/s")
+print(f"Pérdida: {j_sel:.3f} m/m")
+print(f"Longitud equivalente: {Leq_total:.3f} m")
+print(f"Hf: {H:.3f} m")
+print(f"Potencia de bomba: {HP:.3f} HP")
+print("-----------------------------------")
