@@ -6,7 +6,7 @@ from friccion import factor_friccion
 C = 3000            # l/hr
 Longitud_recta = 21.68   # m
 Altura = 10.28      # m
-velocidad_deseada = 0.7  # m/s
+velocidad_deseada = 3  # m/s
 velocidad_min = 0.5      # m/s
 
 eps = 1.5e-6        # rugosidad absoluta en metros
@@ -54,7 +54,7 @@ def l_equivalente(D,f):
     for key in K:
         Leq = (K[key] * D) / f
         total += Leq * accesorios[key]
-    return Leq
+    return total
 
 def Hf(h, L, Leq, j):
     Hf = h + (L + Leq) * j
@@ -95,6 +95,17 @@ H = Hf(Altura, Longitud_recta, Leq_total, j_sel)
 HP = pot_bomba(H, Q)
 
 # -------- SALIDA --------
+print("---------------------------------------------------------------------")
+print("          ","Longitudes equivalentes de accesorios en metros")
+print("Diametro", " ", "Te recta", "  ", "Te lateral", "   ", "Codo 90°", "    ", "LLP" ,"   ", "V-Retencion")
+for x in range(len(D)):
+    leq0 = (K["Te_recta"] * D[x]) / fr[x]
+    leq1 = (K["Te_lateral"] * D[x]) / fr[x]
+    leq2 = (K["Codo_90"] * D[x]) / fr[x]
+    leq3 = (K["LLP"] * D[x]) / fr[x]
+    leq4 = (K["Valvula_retencion"] * D[x]) / fr[x]
+    print(f"{D[x]:.3f}", "     ", f"{leq0:.3f}", "      ", f"{leq1:.3f}", "        ", f"{leq2:.3f}", "      ", f"{leq3:.3f}", "    ", f"{leq4:.3f}")
+
 
 print("-----------------------------------")
 print(f"Diámetro: {D_sel:.3f} m")
